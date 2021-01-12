@@ -8,33 +8,28 @@
  * @returns {Function} return Promise的闭包
  */
 function oneHandle (fn, cache, context) {
-  const queueThen = []
-  const queueCatch = []
-  let cacheData
-  return function () {
-    return new Promise((resolve, reject) => {
-      if (cacheData !== undefined) {
-        resolve(cacheData)
-      } else if (queueThen.length) {
-        queueThen.push(resolve)
-        queueCatch.push(reject)
-      } else {
-        queueThen.push(resolve)
-        queueCatch.push(reject)
-        fn.apply(context, arguments)
-          .then(data => {
-            if (cache) cacheData = data
-            queueThen.forEach(then => then(data))
-            queueThen.length = 0
-            queueCatch.length = 0
-          })
-          .catch(err => {
-            queueCatch.forEach(then => then(err))
-            queueCatch.length = 0
-            queueThen.length = 0
-          })
-      }
-    })
+  let cachedPromiseInstance = null;
+  
+  return function (...argvs) {
+    const ctx = context || this;
+    
+    return cachedPromiseInstance || (
+      cachedPromiseInstance = fn.call(context, ...argvs)
+        .then(
+          res => {
+            if (!cache)
+              cachedPromiseInstance = null;
+            
+            return res
+          },
+          reason => {
+            if (!cache)
+              cachedPromiseInstance = null;
+            
+            throw reason
+          }
+        )
+    )
   }
 }
 if ('undefined' !== typeof module) {
